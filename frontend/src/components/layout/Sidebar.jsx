@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, Mail, Send, User } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, Mail, Send, Settings, User } from 'lucide-react'
 import useAuth from '../../hooks/useAuth'
 import Button from '../ui/Button'
 
@@ -7,6 +7,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
   { icon: Mail, label: 'Compose', to: '/compose' },
   { icon: ClipboardList, label: 'Logs', to: '/logs' },
+  { icon: Settings, label: 'Settings', to: '/settings' },
 ]
 
 const Sidebar = ({ collapsed = false }) => {

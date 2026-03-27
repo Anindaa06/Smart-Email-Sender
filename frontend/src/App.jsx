@@ -10,6 +10,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Compose from './pages/Compose'
 import Logs from './pages/Logs'
+import Settings from './pages/Settings'
 
 const PrivateRoute = ({ children }) => {
   const { isLoading, isAuthenticated } = useAuth()
@@ -32,6 +33,7 @@ const RouterContent = () => {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/compose" element={<PrivateRoute><Compose /></PrivateRoute>} />
           <Route path="/logs" element={<PrivateRoute><Logs /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

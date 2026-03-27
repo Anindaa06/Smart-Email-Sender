@@ -1,6 +1,6 @@
 import express from 'express'
-import { body, query } from 'express-validator'
-import { getEmailLogs, sendBulkEmail } from '../controllers/emailController.js'
+import { body, param, query } from 'express-validator'
+import { getEmailLogs, retryFailedEmailLog, sendBulkEmail } from '../controllers/emailController.js'
 import { authMiddleware } from '../middleware/authMiddleware.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 
@@ -11,12 +11,20 @@ router.post(
   authMiddleware,
   [
     body('recipients').isArray({ min: 1 }).withMessage('Recipients must be a non-empty array'),
-    body('recipients.*').isEmail().withMessage('Each recipient must be a valid email'),
+    body('recipients.*.email').isEmail().withMessage('Each recipient must include a valid email'),
     body('subject').trim().notEmpty().withMessage('Subject is required'),
     body('message').trim().notEmpty().withMessage('Message is required'),
   ],
   validateRequest,
   sendBulkEmail,
+)
+
+router.post(
+  '/retry/:logId',
+  authMiddleware,
+  [param('logId').isMongoId().withMessage('Invalid log id')],
+  validateRequest,
+  retryFailedEmailLog,
 )
 
 router.get(

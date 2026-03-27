@@ -13,6 +13,7 @@ const TopBar = ({ onToggleSidebar }) => {
       '/dashboard': 'Dashboard',
       '/compose': 'Compose Email',
       '/logs': 'Email Logs',
+      '/settings': 'Settings',
     }
     return map[location.pathname] || 'Smart Bulk Mailer'
   }, [location.pathname])

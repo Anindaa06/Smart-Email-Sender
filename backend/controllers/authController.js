@@ -81,6 +81,7 @@ export const getMe = async (req, res, next) => {
       name: user.name,
       email: user.email,
       smtpConfig: buildDecryptedSmtp(user.smtpConfig),
+      sendingPreferences: user.sendingPreferences,
       createdAt: user.createdAt,
     })
   } catch (error) {
@@ -102,6 +103,40 @@ export const saveSmtpConfig = async (req, res, next) => {
     })
 
     return res.json({ message: 'SMTP config saved successfully' })
+  } catch (error) {
+    return next(error)
+  }
+}
+
+export const getUserPreferences = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('sendingPreferences')
+    if (!user) return res.status(404).json({ message: 'User not found' })
+    return res.json({ preferences: user.sendingPreferences })
+  } catch (error) {
+    return next(error)
+  }
+}
+
+export const updateSendingPreferences = async (req, res, next) => {
+  try {
+    const { batchSize, delayBetweenBatches, maxRetriesPerEmail } = req.body
+
+    const user = await User.findById(req.user.id)
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    user.sendingPreferences = {
+      batchSize,
+      delayBetweenBatches,
+      maxRetriesPerEmail,
+    }
+
+    await user.save()
+
+    return res.json({
+      message: 'Preferences updated successfully',
+      preferences: user.sendingPreferences,
+    })
   } catch (error) {
     return next(error)
   }

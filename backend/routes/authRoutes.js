@@ -1,7 +1,15 @@
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import { body } from 'express-validator'
-import { getMe, login, logout, register, saveSmtpConfig } from '../controllers/authController.js'
+import {
+  getMe,
+  getUserPreferences,
+  login,
+  logout,
+  register,
+  saveSmtpConfig,
+  updateSendingPreferences,
+} from '../controllers/authController.js'
 import { authMiddleware } from '../middleware/authMiddleware.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 
@@ -51,6 +59,20 @@ router.put(
   ],
   validateRequest,
   saveSmtpConfig,
+)
+
+router.get('/preferences', authMiddleware, getUserPreferences)
+
+router.put(
+  '/preferences',
+  authMiddleware,
+  [
+    body('batchSize').isInt({ min: 1, max: 100 }).withMessage('batchSize must be between 1 and 100'),
+    body('delayBetweenBatches').isInt({ min: 500, max: 30000 }).withMessage('delayBetweenBatches must be between 500 and 30000'),
+    body('maxRetriesPerEmail').isInt({ min: 1, max: 5 }).withMessage('maxRetriesPerEmail must be between 1 and 5'),
+  ],
+  validateRequest,
+  updateSendingPreferences,
 )
 
 router.post('/logout', logout)

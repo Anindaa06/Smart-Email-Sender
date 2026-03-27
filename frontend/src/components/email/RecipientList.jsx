@@ -1,57 +1,59 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { isValidEmail } from '../../utils/validators'
 import { pushToast } from '../../hooks/useToast'
 import Button from '../ui/Button'
 import RecipientField from './RecipientField'
 
-const RecipientList = ({ onChange }) => {
-  const [items, setItems] = useState([{ id: Date.now(), value: '', error: '' }])
-
-  const validRecipients = useMemo(() => items.filter((item) => isValidEmail(item.value)).map((item) => item.value.trim()), [items])
-
+const RecipientList = ({ recipients, setRecipients, onChange, disabled = false }) => {
   useEffect(() => {
+    const validRecipients = recipients
+      .filter((item) => isValidEmail(item.email || ''))
+      .map((item) => {
+        const { id, error, ...rest } = item
+        return { ...rest, email: item.email.trim().toLowerCase() }
+      })
     onChange(validRecipients)
-  }, [validRecipients, onChange])
+  }, [recipients, onChange])
 
   const addRecipient = () => {
-    if (items.length >= 50) {
+    if (recipients.length >= 50) {
       pushToast('Maximum 50 recipients allowed', 'warning')
       return
     }
-    setItems((prev) => [...prev, { id: Date.now() + Math.random(), value: '', error: '' }])
+    setRecipients((prev) => [...prev, { id: Date.now() + Math.random(), email: '', name: '', company: '', error: '' }])
   }
 
   const removeRecipient = (id) => {
-    if (items.length === 1) {
+    if (recipients.length === 1) {
       pushToast('At least one recipient field is required', 'warning')
       return
     }
-    setItems((prev) => prev.filter((item) => item.id !== id))
+    setRecipients((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const updateRecipient = (id, value) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, value, error: value && !isValidEmail(value) ? 'Invalid email address' : '' }
-          : item,
-      ),
-    )
+  const updateRecipient = (id, patch) => {
+    setRecipients((prev) => prev.map((item) => {
+      if (item.id !== id) return item
+      const next = { ...item, ...patch }
+      const email = String(next.email || '')
+      next.error = email && !isValidEmail(email) ? 'Invalid email address' : ''
+      return next
+    }))
   }
 
   return (
     <div className="space-y-3">
-      {items.map((item, index) => (
+      {recipients.map((recipient, index) => (
         <RecipientField
-          key={item.id}
-          value={item.value}
-          error={item.error}
+          key={recipient.id}
+          recipient={recipient}
           index={index}
-          onChange={(value) => updateRecipient(item.id, value)}
-          onRemove={() => removeRecipient(item.id)}
+          onChange={(patch) => updateRecipient(recipient.id, patch)}
+          onRemove={() => removeRecipient(recipient.id)}
+          disabled={disabled}
         />
       ))}
-      <Button variant="ghost" onClick={addRecipient}>+ Add Recipient</Button>
+      <Button variant="ghost" onClick={addRecipient} disabled={disabled}>+ Add Recipient</Button>
     </div>
   )
 }

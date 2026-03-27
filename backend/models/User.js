@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema({
     user: { type: String, default: '' },
     pass: { type: String, default: '' },
   },
+  sendingPreferences: {
+    batchSize: { type: Number, default: 10, min: 1, max: 100 },
+    delayBetweenBatches: { type: Number, default: 1000, min: 500, max: 30000 },
+    maxRetriesPerEmail: { type: Number, default: 3, min: 1, max: 5 },
+  },
   createdAt: { type: Date, default: Date.now },
 })
 
