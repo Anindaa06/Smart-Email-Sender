@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+﻿import mongoose from 'mongoose'
 
 const scheduledEmailSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -11,6 +11,7 @@ const scheduledEmailSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'sent', 'failed', 'cancelled'],
     default: 'pending',
   },
+  bullJobId: { type: String },
   createdAt: { type: Date, default: Date.now },
   sentAt: { type: Date },
   errorDetails: { type: String, default: '' },

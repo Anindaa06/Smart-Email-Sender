@@ -12,6 +12,7 @@ import RecipientImporter from '../components/email/RecipientImporter'
 import VariableHelper from '../components/email/VariableHelper'
 import ScheduleModal from '../components/email/ScheduleModal'
 import SendingProgress from '../components/email/SendingProgress'
+import MLInsightsPanel from '../components/email/MLInsightsPanel'
 import useAuth from '../hooks/useAuth'
 import { pushToast } from '../hooks/useToast'
 import { sendBulkEmail } from '../services/emailService'
@@ -136,6 +137,9 @@ const Compose = () => {
             <EmailComposer subject={subject} setSubject={setSubject} message={message} setMessage={setMessage} />
             <div className="mt-3">
               <VariableHelper subject={subject} message={message} recipients={validRecipients} />
+            </div>
+            <div className="mt-3">
+              <MLInsightsPanel subject={subject} message={message} recipientCount={validRecipients.length} />
             </div>
 
             <div className="sticky bottom-0 mt-4 flex flex-wrap gap-2 bg-surface pt-3">

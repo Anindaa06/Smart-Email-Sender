@@ -1,10 +1,7 @@
-import crypto from 'crypto'
 import User from '../models/User.js'
 import EmailLog from '../models/EmailLog.js'
-import { decrypt } from '../utils/encryptCredentials.js'
-import { createTransporter } from '../config/nodemailer.js'
-import { sendEmailBatch } from '../utils/sendEmailBatch.js'
-import { emitProgress } from '../routes/progressRoutes.js'
+import { addEmailJob } from '../queue/emailQueue.js'
+import { predictPerformance, predictSpam } from '../services/mlService.js'
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
@@ -38,60 +35,58 @@ export const sendBulkEmail = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    const decryptedConfig = {
-      host: user.smtpConfig.host ? decrypt(user.smtpConfig.host) : '',
-      port: user.smtpConfig.port || 587,
-      user: user.smtpConfig.user ? decrypt(user.smtpConfig.user) : '',
-      pass: user.smtpConfig.pass ? decrypt(user.smtpConfig.pass) : '',
-    }
-
-    if (!decryptedConfig.host || !decryptedConfig.user || !decryptedConfig.pass) {
+    if (!user.smtpConfig?.host) {
       return res.status(400).json({ message: 'SMTP credentials are incomplete. Please save SMTP config first.' })
     }
 
-    const transporter = createTransporter(decryptedConfig)
-    await transporter.verify()
+    const [spamPrediction, performancePrediction] = await Promise.all([
+      predictSpam(subject, message),
+      predictPerformance(subject, normalizedRecipients.length, null),
+    ])
 
-    const log = await EmailLog.create({
+    const emailLog = await EmailLog.create({
       userId: req.user.id,
-      recipients: normalizedRecipients.map((recipient) => ({ ...recipient, status: 'pending', attempts: 0 })),
+      recipients: normalizedRecipients.map((recipient) => ({
+        email: recipient.email,
+        name: recipient.name || '',
+        company: recipient.company || '',
+        status: 'pending',
+        attempts: 0,
+      })),
       subject,
       message,
-      status: 'partial',
+      status: 'queued',
       sentCount: 0,
       failedCount: 0,
-      errorDetails: '',
+      timestamp: new Date(),
+      mlPredictions: {
+        spamProbability: spamPrediction?.spam_probability || 0,
+        predictedOpenRate: performancePrediction?.expected_open_rate || 0,
+        performanceTier: performancePrediction?.performance_tier || 'unknown',
+      },
     })
 
-    const jobId = crypto.randomUUID()
+    const prefs = user.sendingPreferences || {}
 
-    res.json({ jobId, logId: log._id, total: normalizedRecipients.length })
+    const job = await addEmailJob({
+      userId: req.user.id,
+      recipients: normalizedRecipients,
+      subject,
+      message,
+      logId: emailLog._id.toString(),
+      batchSize: prefs.batchSize || 10,
+      delayBetweenBatches: prefs.delayBetweenBatches || 1000,
+    })
 
-    ;(async () => {
-      try {
-        await sendEmailBatch({
-          userId: req.user.id,
-          recipients: normalizedRecipients,
-          subject,
-          message,
-          transporter,
-          logId: log._id,
-          fromAddress: decryptedConfig.user,
-          onProgress: async () => {
-            const latest = await EmailLog.findById(log._id)
-            if (!latest) return
-            emitProgress(jobId, {
-              sent: latest.sentCount,
-              failed: latest.failedCount,
-              total: latest.recipients.length,
-            })
-          },
-          emitProgress: (data) => emitProgress(jobId, data),
-        })
-      } catch (error) {
-        emitProgress(jobId, { done: true, error: error.message || 'Sending failed' })
-      }
-    })()
+    await EmailLog.findByIdAndUpdate(emailLog._id, { queueJobId: String(job.id) })
+
+    return res.status(202).json({
+      success: true,
+      message: 'Email job queued successfully',
+      jobId: job.id,
+      logId: emailLog._id,
+      recipientCount: normalizedRecipients.length,
+    })
   } catch (error) {
     return next(error)
   }
@@ -104,26 +99,39 @@ export const retryFailedEmailLog = async (req, res, next) => {
       return res.status(404).json({ message: 'Email log not found' })
     }
 
-    const updated = (log.recipients || []).map((recipient) => {
-      if (typeof recipient === 'string') {
-        return { email: recipient, status: 'retrying', attempts: 0, nextRetryAt: new Date() }
-      }
+    const failedRecipients = (log.recipients || [])
+      .map((recipient) => (typeof recipient === 'string' ? { email: recipient, status: 'failed' } : recipient))
+      .filter((recipient) => recipient.status === 'failed')
 
-      if (recipient.status === 'failed') {
-        return {
-          ...recipient,
-          status: 'retrying',
-          nextRetryAt: new Date(),
-        }
-      }
+    if (!failedRecipients.length) {
+      return res.status(400).json({ message: 'No failed recipients found for retry' })
+    }
 
-      return recipient
+    const user = await User.findById(req.user.id)
+    const prefs = user?.sendingPreferences || {}
+
+    const retryLog = await EmailLog.create({
+      userId: req.user.id,
+      recipients: failedRecipients.map((recipient) => ({ ...recipient, status: 'pending', attempts: Number(recipient.attempts || 0) })),
+      subject: log.subject,
+      message: log.message,
+      status: 'queued',
+      sentCount: 0,
+      failedCount: 0,
+      timestamp: new Date(),
     })
 
-    log.recipients = updated
-    await log.save()
+    const job = await addEmailJob({
+      userId: req.user.id,
+      recipients: failedRecipients,
+      subject: log.subject,
+      message: log.message,
+      logId: retryLog._id.toString(),
+      batchSize: prefs.batchSize || 10,
+      delayBetweenBatches: prefs.delayBetweenBatches || 1000,
+    })
 
-    return res.json({ message: 'Retry queued for failed recipients' })
+    return res.json({ message: 'Retry queued for failed recipients', jobId: job.id, logId: retryLog._id })
   } catch (error) {
     return next(error)
   }

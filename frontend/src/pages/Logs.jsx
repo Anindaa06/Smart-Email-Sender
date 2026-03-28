@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Input from '../components/ui/Input'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import TrackingBadge from '../components/email/TrackingBadge'
 import { getEmailLogs, retryFailedEmails } from '../services/emailService'
 import { cancelScheduledEmail, getScheduledEmails } from '../services/scheduleService'
 import { pushToast } from '../hooks/useToast'
@@ -154,6 +155,12 @@ const Logs = () => {
                           {expanded[log._id] ? (
                             <tr>
                               <td colSpan={6} className="space-y-2 px-2 pb-3">
+                                <TrackingBadge
+                                  opens={log.totalOpens || 0}
+                                  clicks={log.totalClicks || 0}
+                                  openRate={log.openRate || 0}
+                                  clickRate={log.clickRate || 0}
+                                />
                                 <table className="w-full text-xs">
                                   <thead>
                                     <tr className="text-text-secondary">
